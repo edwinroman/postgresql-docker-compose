@@ -1,38 +1,50 @@
-name: postgresql-docker-compose
+version: '3.8'
 
 services:
   postgresql:
     container_name: postgresql
     image: postgres:alpine
     ports:
-      - 5432:5432
+      - "5432:5432"
     environment:
       - POSTGRES_USER=${POSTGRES_DB_USER}
       - POSTGRES_PASSWORD=${POSTGRES_DB_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB_DEFAULT}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker-db-init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - development-network
-    volumes:
-      - ${POSTGRES_HOST_DATA}/data:/var/lib/postgresql/data
-      - ./docker-db-init.sql:/docker-entrypoint-initdb.d/create_tables.sql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_DB_USER} -d ${POSTGRES_DB_DEFAULT}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   pgadmin:
     container_name: pgadmin
     image: dpage/pgadmin4:latest
     depends_on:
-      - postgresql
+      postgresql:
+        condition: service_healthy
     environment:
       - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
       - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
       - PGADMIN_CONFIG_SERVER_MODE=False
     volumes:
-      - ${POSTGRES_HOST_DATA}/pgadmin:/var/lib/pgadmin
+      - pgadmin_data:/var/lib/pgadmin
     ports:
-      - 5050:80
+      - "5050:80"
     networks:
       - development-network
+    restart: unless-stopped
 
 networks:
   development-network:
-    name: development-network
     driver: bridge
+
+volumes:
+  postgres_data:
+  pgadmin_data:
